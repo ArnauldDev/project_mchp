@@ -41,9 +41,30 @@
     SOFTWARE.
  */
 
+#include <bits/alltypes.h>
+
 #include "mcc_generated_files/mcc.h"
 
 #define PRESSED 0
+
+#define STR_FIRMWARE_DESCRIPTION "Demo for push button and Sleep mode "
+#define STR_FIRMWARE_VERSION     "v0.1"  /* Firmware version */
+
+/**
+ * @brief counter the number of LED state from starting
+ */
+uint32_t counter = 0;
+
+/*
+ Serial communication
+
+    Les broches par défaut sont :
+    TX = RC6
+    RX = RC7
+    Pour une utilisation avec la carte MPLAB Xpress Evaluation Boards :
+    TX = RC0 (F188TXU)
+    RX = RC1 (F188RXU)
+ */
 
 /*
                          Main application
@@ -57,10 +78,10 @@ void main( void )
     // Use the following macros to:
 
     // Enable the Global Interrupts
-    //INTERRUPT_GlobalInterruptEnable();
+    INTERRUPT_GlobalInterruptEnable( );
 
     // Enable the Peripheral Interrupts
-    //INTERRUPT_PeripheralInterruptEnable();
+    INTERRUPT_PeripheralInterruptEnable( );
 
     // Disable the Global Interrupts
     //INTERRUPT_GlobalInterruptDisable();
@@ -70,13 +91,64 @@ void main( void )
 
     while ( 1 )
     {
-        // Add your application code
+        /* Pour mesurer le temps d'exécution de la boucle principale
+         * LED_System_Toggle( );
+         */
+        
+        /* Incrémenter le compteur lorsque BP est pressé */
         if ( PRESSED == pushButton_GetValue( ) )
         {
+            while ( PRESSED == pushButton_GetValue( ) );
+            __delay_ms( 1 );
+            LED_Toggle( );
+            ++counter;
+        }
 
+        /* Traitement d'une donnée en reception du port série */
+        if ( EUSART_is_rx_ready( ) )
+        {
+            /* If there is at least one byte of data has been received. */
+            uint8_t rx_data_from_serial = EUSART_Read( );
+
+            printf( "\r\n" );
+
+            switch ( rx_data_from_serial )
+            {
+                case '?':
+                case ',':
+                    printf( "Send C to get counter value.\r\n" );
+                    break;
+
+                case 'V':
+                case 'v':
+                    printf( STR_FIRMWARE_DESCRIPTION STR_FIRMWARE_VERSION "\r\n" );
+                    printf( "Build on " __DATE__ " at " __TIME__ "\r\n" );
+                    break;
+
+                case 'C':
+                case 'c':
+                    printf( "Counter value: %d\r\n", counter );
+                    break;
+
+                case 'S':
+                case 's':
+                    printf( "Enter in Sleep mode...\r\n\n" );
+                    LED_SetLow( );
+                    __delay_ms( 20 );
+                    /* datasheet "8.2.3 LOW-POWER SLEEP MODE" page 156 */
+                    SLEEP( );
+                    __delay_ms( 10 );
+                    printf( "\r\nWake up from Sleep mode!\r\n\n" );
+                    break;
+
+                default:
+                    printf( "Cmd not recognised! Send ? for help.\r\n" );
+            }
         }
     }
 }
+
+
 
 
 /**
